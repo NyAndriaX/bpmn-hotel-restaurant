@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPMN - Hôtel et Restaurant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        .header {
+            background: linear-gradient(135deg, #16213e, #0f3460);
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .header h1 { font-size: 1.4em; color: #e94560; }
+        .header .info { font-size: 0.85em; color: #aaa; }
+        #canvas {
+            width: 100%;
+            height: calc(100vh - 80px);
+            background: #fff;
+        }
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+        .controls button {
+            background: #0f3460;
+            color: #fff;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        .controls button:hover { background: #e94560; }
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: calc(100vh - 80px);
+            background: #fff;
+            color: #333;
+            font-size: 1.2em;
+        }
+        .loading.hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Processus Métier BPMN — Hôtel et Restaurant</h1>
+        <div class="info">Pools: Client | Hôtel (Réceptionniste, Ménage, Comptable) | Restaurant | Facebook</div>
+    </div>
+    <div id="loading" class="loading">Chargement du diagramme BPMN...</div>
+    <div id="canvas"></div>
+    <div class="controls">
+        <button onclick="zoomIn()">+ Zoom</button>
+        <button onclick="zoomOut()">- Zoom</button>
+        <button onclick="fitViewport()">Ajuster</button>
+        <button onclick="downloadSVG()">Exporter SVG</button>
+    </div>
+
+    <script src="https://unpkg.com/bpmn-js@17.11.1/dist/bpmn-navigated-viewer.production.min.js"></script>
+    <script>
+        const bpmnXML = `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             id="Definitions_1"
+             targetNamespace="http://bonitasoft.com/bpmn/hotel-restaurant"
+             exporter="Bonita Studio"
+             exporterVersion="2024.1">
+
+  <message id="msg_demande_reservation" name="DemandeReservation"/>
+  <message id="msg_confirmation_reservation" name="ConfirmationReservation"/>
+  <message id="msg_notification_menage" name="NotificationMenage"/>
+  <message id="msg_copie_facture" name="CopieFacture"/>
+  <message id="msg_demande_tarif" name="DemandeTarif"/>
+  <message id="msg_reponse_tarif" name="ReponseTarif"/>
+  <message id="msg_commande_restaurant" name="CommandeRestaurant"/>
+  <message id="msg_facture_restaurant" name="FactureRestaurant"/>
+
+  <collaboration id="Collaboration_Hotel_Restaurant">
+    <participant id="pool_client" name="Client" processRef="Process_Client"/>
+    <participant id="pool_hotel" name="Hôtel" processRef="Process_Hotel"/>
+    <participant id="pool_restaurant" name="Restaurant" processRef="Process_Restaurant"/>
+    <participant id="pool_facebook" name="Page Facebook" processRef="Process_Facebook"/>
+
+    <messageFlow id="mf_reservation" name="Demande de réservation" sourceRef="task_reserver_chambre" targetRef="start_reception_reservation"/>
+    <messageFlow id="mf_confirmation" name="Confirmation + Facture" sourceRef="task_emettre_facture" targetRef="task_recevoir_confirmation"/>
+    <messageFlow id="mf_notif_menage" name="Notification ménage terminé" sourceRef="task_notifier_receptionniste" targetRef="task_recevoir_notif_menage"/>
+    <messageFlow id="mf_copie_facture" name="Copie de facture" sourceRef="task_envoyer_copie_facture" targetRef="start_comptabilite"/>
+    <messageFlow id="mf_demande_tarif" name="Demande tarif" sourceRef="task_demander_tarif" targetRef="start_facebook"/>
+    <messageFlow id="mf_reponse_tarif" name="Réponse tarif" sourceRef="task_repondre_tarif" targetRef="task_recevoir_reponse_tarif"/>
+    <messageFlow id="mf_commande_resto" name="Commande restaurant" sourceRef="task_commander_restaurant" targetRef="start_commande_restaurant"/>
+    <messageFlow id="mf_facture_resto" name="Facture restaurant ajoutée" sourceRef="task_transferer_facture" targetRef="task_recevoir_facture_resto"/>
+  </collaboration>
+
+  <process id="Process_Client" name="Processus Client" isExecutable="true">
+    <startEvent id="start_client" name="Besoin d une chambre">
+      <outgoing>flow_c1</outgoing>
+    </startEvent>
+    <exclusiveGateway id="gw_canal_client" name="Canal de contact ?">
+      <incoming>flow_c1</incoming>
+      <outgoing>flow_c2_web</outgoing>
+      <outgoing>flow_c2_fb</outgoing>
+    </exclusiveGateway>
+    <userTask id="task_reserver_chambre" name="Réserver chambre via site web">
+      <incoming>flow_c2_web</incoming>
+      <incoming>flow_c_fb3_oui</incoming>
+      <outgoing>flow_c3</outgoing>
+    </userTask>
+    <userTask id="task_fournir_piece_identite" name="Fournir pièce identité">
+      <incoming>flow_c3</incoming>
+      <outgoing>flow_c4</outgoing>
+    </userTask>
+    <userTask id="task_recevoir_confirmation" name="Recevoir confirmation et facture">
+      <incoming>flow_c4</incoming>
+      <outgoing>flow_c5</outgoing>
+    </userTask>
+    <userTask id="task_effectuer_paiement" name="Effectuer le paiement">
+      <incoming>flow_c5</incoming>
+      <outgoing>flow_c6</outgoing>
+    </userTask>
+    <userTask id="task_sejour" name="Séjour (nuitée)">
+      <incoming>flow_c6</incoming>
+      <outgoing>flow_c7</outgoing>
+    </userTask>
+    <exclusiveGateway id="gw_restaurant" name="Commander au restaurant ?">
+      <incoming>flow_c7</incoming>
+      <outgoing>flow_c8_oui</outgoing>
+      <outgoing>flow_c8_non</outgoing>
+    </exclusiveGateway>
+    <userTask id="task_commander_restaurant" name="Commander au restaurant">
+      <incoming>flow_c8_oui</incoming>
+      <outgoing>flow_c9</outgoing>
+    </userTask>
+    <userTask id="task_recevoir_facture_resto" name="Facture restaurant ajoutée à chambre">
+      <incoming>flow_c9</incoming>
+      <outgoing>flow_c10</outgoing>
+    </userTask>
+    <exclusiveGateway id="gw_merge_resto" name="Fusion">
+      <incoming>flow_c8_non</incoming>
+      <incoming>flow_c10</incoming>
+      <outgoing>flow_c11</outgoing>
+    </exclusiveGateway>
+    <userTask id="task_quitter_hotel" name="Quitter hôtel">
+      <incoming>flow_c11</incoming>
+      <outgoing>flow_c_end</outgoing>
+    </userTask>
+    <userTask id="task_demander_tarif" name="Demander tarif via Facebook">
+      <incoming>flow_c2_fb</incoming>
+      <outgoing>flow_c_fb1</outgoing>
+    </userTask>
+    <userTask id="task_recevoir_reponse_tarif" name="Recevoir réponse tarif">
+      <incoming>flow_c_fb1</incoming>
+      <outgoing>flow_c_fb2</outgoing>
+    </userTask>
+    <exclusiveGateway id="gw_apres_tarif" name="Réserver ?">
+      <incoming>flow_c_fb2</incoming>
+      <outgoing>flow_c_fb3_oui</outgoing>
+      <outgoing>flow_c_fb3_non</outgoing>
+    </exclusiveGateway>
+    <endEvent id="end_client_no_reservation" name="Pas de réservation">
+      <incoming>flow_c_fb3_non</incoming>
+    </endEvent>
+    <endEvent id="end_client" name="Fin séjour client">
+      <incoming>flow_c_end</incoming>
+    </endEvent>
+    <sequenceFlow id="flow_c1" sourceRef="start_client" targetRef="gw_canal_client"/>
+    <sequenceFlow id="flow_c2_web" name="Site Web" sourceRef="gw_canal_client" targetRef="task_reserver_chambre"/>
+    <sequenceFlow id="flow_c2_fb" name="Facebook" sourceRef="gw_canal_client" targetRef="task_demander_tarif"/>
+    <sequenceFlow id="flow_c3" sourceRef="task_reserver_chambre" targetRef="task_fournir_piece_identite"/>
+    <sequenceFlow id="flow_c4" sourceRef="task_fournir_piece_identite" targetRef="task_recevoir_confirmation"/>
+    <sequenceFlow id="flow_c5" sourceRef="task_recevoir_confirmation" targetRef="task_effectuer_paiement"/>
+    <sequenceFlow id="flow_c6" sourceRef="task_effectuer_paiement" targetRef="task_sejour"/>
+    <sequenceFlow id="flow_c7" sourceRef="task_sejour" targetRef="gw_restaurant"/>
+    <sequenceFlow id="flow_c8_oui" name="Oui" sourceRef="gw_restaurant" targetRef="task_commander_restaurant"/>
+    <sequenceFlow id="flow_c8_non" name="Non" sourceRef="gw_restaurant" targetRef="gw_merge_resto"/>
+    <sequenceFlow id="flow_c9" sourceRef="task_commander_restaurant" targetRef="task_recevoir_facture_resto"/>
+    <sequenceFlow id="flow_c10" sourceRef="task_recevoir_facture_resto" targetRef="gw_merge_resto"/>
+    <sequenceFlow id="flow_c11" sourceRef="gw_merge_resto" targetRef="task_quitter_hotel"/>
+    <sequenceFlow id="flow_c_end" sourceRef="task_quitter_hotel" targetRef="end_client"/>
+    <sequenceFlow id="flow_c_fb1" sourceRef="task_demander_tarif" targetRef="task_recevoir_reponse_tarif"/>
+    <sequenceFlow id="flow_c_fb2" sourceRef="task_recevoir_reponse_tarif" targetRef="gw_apres_tarif"/>
+    <sequenceFlow id="flow_c_fb3_oui" name="Oui - Réserver" sourceRef="gw_apres_tarif" targetRef="task_reserver_chambre"/>
+    <sequenceFlow id="flow_c_fb3_non" name="Non" sourceRef="gw_apres_tarif" targetRef="end_client_no_reservation"/>
+  </process>
+
+  <process id="Process_Hotel" name="Processus Hôtel" isExecutable="true">
+    <laneSet id="laneSet_hotel">
+      <lane id="lane_receptionniste" name="Réceptionniste">
+        <flowNodeRef>start_reception_reservation</flowNodeRef>
+        <flowNodeRef>task_verifier_disponibilite</flowNodeRef>
+        <flowNodeRef>gw_chambre_disponible</flowNodeRef>
+        <flowNodeRef>task_emettre_facture</flowNodeRef>
+        <flowNodeRef>task_envoyer_copie_facture</flowNodeRef>
+        <flowNodeRef>task_encaisser_paiement</flowNodeRef>
+        <flowNodeRef>task_recevoir_notif_menage</flowNodeRef>
+        <flowNodeRef>task_marquer_chambre_disponible</flowNodeRef>
+        <flowNodeRef>end_reservation_refusee</flowNodeRef>
+        <flowNodeRef>end_reservation_complete</flowNodeRef>
+      </lane>
+      <lane id="lane_menage" name="Femmes de ménage">
+        <flowNodeRef>start_menage</flowNodeRef>
+        <flowNodeRef>task_nettoyer_chambre</flowNodeRef>
+        <flowNodeRef>task_remplacer_articles</flowNodeRef>
+        <flowNodeRef>task_notifier_receptionniste</flowNodeRef>
+        <flowNodeRef>end_menage</flowNodeRef>
+      </lane>
+      <lane id="lane_comptable" name="Comptable">
+        <flowNodeRef>start_comptabilite</flowNodeRef>
+        <flowNodeRef>task_recevoir_copie_facture</flowNodeRef>
+        <flowNodeRef>task_verifier_stock</flowNodeRef>
+        <flowNodeRef>gw_stock_suffisant</flowNodeRef>
+        <flowNodeRef>task_commander_articles</flowNodeRef>
+        <flowNodeRef>task_compter_factures_jour</flowNodeRef>
+        <flowNodeRef>task_generer_tableau_bord</flowNodeRef>
+        <flowNodeRef>end_comptabilite</flowNodeRef>
+      </lane>
+    </laneSet>
+
+    <startEvent id="start_reception_reservation" name="Réception réservation">
+      <outgoing>flow_h1</outgoing>
+      <messageEventDefinition messageRef="msg_demande_reservation"/>
+    </startEvent>
+    <serviceTask id="task_verifier_disponibilite" name="Vérifier disponibilité (chambres propres)">
+      <incoming>flow_h1</incoming>
+      <outgoing>flow_h2</outgoing>
+    </serviceTask>
+    <exclusiveGateway id="gw_chambre_disponible" name="Chambre disponible ?">
+      <incoming>flow_h2</incoming>
+      <outgoing>flow_h3_oui</outgoing>
+      <outgoing>flow_h3_non</outgoing>
+    </exclusiveGateway>
+    <endEvent id="end_reservation_refusee" name="Refusée">
+      <incoming>flow_h3_non</incoming>
+    </endEvent>
+    <userTask id="task_emettre_facture" name="Émettre facture (Standard/Suite Senior/Suite Prestige)">
+      <incoming>flow_h3_oui</incoming>
+      <outgoing>flow_h4</outgoing>
+    </userTask>
+    <userTask id="task_encaisser_paiement" name="Encaisser paiement">
+      <incoming>flow_h4</incoming>
+      <outgoing>flow_h5</outgoing>
+    </userTask>
+    <sendTask id="task_envoyer_copie_facture" name="Envoyer copie facture au comptable">
+      <incoming>flow_h5</incoming>
+      <outgoing>flow_h6</outgoing>
+    </sendTask>
+    <endEvent id="end_reservation_complete" name="Réservation complète">
+      <incoming>flow_h6</incoming>
+      <incoming>flow_h_notif1</incoming>
+    </endEvent>
+    <intermediateCatchEvent id="task_recevoir_notif_menage" name="Notification ménage reçue">
+      <outgoing>flow_h_notif_to_mark</outgoing>
+      <messageEventDefinition messageRef="msg_notification_menage"/>
+    </intermediateCatchEvent>
+    <serviceTask id="task_marquer_chambre_disponible" name="Marquer chambre disponible">
+      <incoming>flow_h_notif_to_mark</incoming>
+      <outgoing>flow_h_notif1</outgoing>
+    </serviceTask>
+
+    <startEvent id="start_menage" name="Départ du client">
+      <outgoing>flow_m1</outgoing>
+    </startEvent>
+    <userTask id="task_nettoyer_chambre" name="Nettoyer la chambre">
+      <incoming>flow_m1</incoming>
+      <outgoing>flow_m2</outgoing>
+    </userTask>
+    <userTask id="task_remplacer_articles" name="Remplacer articles (gel, papier, pantoufle, brosse)">
+      <incoming>flow_m2</incoming>
+      <outgoing>flow_m3</outgoing>
+    </userTask>
+    <sendTask id="task_notifier_receptionniste" name="Notifier réceptionniste">
+      <incoming>flow_m3</incoming>
+      <outgoing>flow_m4</outgoing>
+    </sendTask>
+    <endEvent id="end_menage" name="Ménage terminé">
+      <incoming>flow_m4</incoming>
+    </endEvent>
+
+    <startEvent id="start_comptabilite" name="Copie facture reçue">
+      <outgoing>flow_cp1</outgoing>
+      <messageEventDefinition messageRef="msg_copie_facture"/>
+    </startEvent>
+    <userTask id="task_recevoir_copie_facture" name="Vérifier copie facture">
+      <incoming>flow_cp1</incoming>
+      <outgoing>flow_cp2</outgoing>
+    </userTask>
+    <userTask id="task_verifier_stock" name="Vérifier stock articles">
+      <incoming>flow_cp2</incoming>
+      <outgoing>flow_cp3</outgoing>
+    </userTask>
+    <exclusiveGateway id="gw_stock_suffisant" name="Stock suffisant ?">
+      <incoming>flow_cp3</incoming>
+      <outgoing>flow_cp4_oui</outgoing>
+      <outgoing>flow_cp4_non</outgoing>
+    </exclusiveGateway>
+    <userTask id="task_commander_articles" name="Réapprovisionner articles">
+      <incoming>flow_cp4_non</incoming>
+      <outgoing>flow_cp5</outgoing>
+    </userTask>
+    <userTask id="task_compter_factures_jour" name="Compter factures par jour">
+      <incoming>flow_cp4_oui</incoming>
+      <incoming>flow_cp5</incoming>
+      <outgoing>flow_cp6</outgoing>
+    </userTask>
+    <userTask id="task_generer_tableau_bord" name="Générer tableau de bord">
+      <incoming>flow_cp6</incoming>
+      <outgoing>flow_cp7</outgoing>
+    </userTask>
+    <endEvent id="end_comptabilite" name="Comptabilité terminée">
+      <incoming>flow_cp7</incoming>
+    </endEvent>
+
+    <sequenceFlow id="flow_h1" sourceRef="start_reception_reservation" targetRef="task_verifier_disponibilite"/>
+    <sequenceFlow id="flow_h2" sourceRef="task_verifier_disponibilite" targetRef="gw_chambre_disponible"/>
+    <sequenceFlow id="flow_h3_oui" name="Oui" sourceRef="gw_chambre_disponible" targetRef="task_emettre_facture"/>
+    <sequenceFlow id="flow_h3_non" name="Non" sourceRef="gw_chambre_disponible" targetRef="end_reservation_refusee"/>
+    <sequenceFlow id="flow_h4" sourceRef="task_emettre_facture" targetRef="task_encaisser_paiement"/>
+    <sequenceFlow id="flow_h5" sourceRef="task_encaisser_paiement" targetRef="task_envoyer_copie_facture"/>
+    <sequenceFlow id="flow_h6" sourceRef="task_envoyer_copie_facture" targetRef="end_reservation_complete"/>
+    <sequenceFlow id="flow_h_notif_to_mark" sourceRef="task_recevoir_notif_menage" targetRef="task_marquer_chambre_disponible"/>
+    <sequenceFlow id="flow_h_notif1" sourceRef="task_marquer_chambre_disponible" targetRef="end_reservation_complete"/>
+    <sequenceFlow id="flow_m1" sourceRef="start_menage" targetRef="task_nettoyer_chambre"/>
+    <sequenceFlow id="flow_m2" sourceRef="task_nettoyer_chambre" targetRef="task_remplacer_articles"/>
+    <sequenceFlow id="flow_m3" sourceRef="task_remplacer_articles" targetRef="task_notifier_receptionniste"/>
+    <sequenceFlow id="flow_m4" sourceRef="task_notifier_receptionniste" targetRef="end_menage"/>
+    <sequenceFlow id="flow_cp1" sourceRef="start_comptabilite" targetRef="task_recevoir_copie_facture"/>
+    <sequenceFlow id="flow_cp2" sourceRef="task_recevoir_copie_facture" targetRef="task_verifier_stock"/>
+    <sequenceFlow id="flow_cp3" sourceRef="task_verifier_stock" targetRef="gw_stock_suffisant"/>
+    <sequenceFlow id="flow_cp4_oui" name="Oui" sourceRef="gw_stock_suffisant" targetRef="task_compter_factures_jour"/>
+    <sequenceFlow id="flow_cp4_non" name="Non" sourceRef="gw_stock_suffisant" targetRef="task_commander_articles"/>
+    <sequenceFlow id="flow_cp5" sourceRef="task_commander_articles" targetRef="task_compter_factures_jour"/>
+    <sequenceFlow id="flow_cp6" sourceRef="task_compter_factures_jour" targetRef="task_generer_tableau_bord"/>
+    <sequenceFlow id="flow_cp7" sourceRef="task_generer_tableau_bord" targetRef="end_comptabilite"/>
+  </process>
+
+  <process id="Process_Restaurant" name="Processus Restaurant" isExecutable="true">
+    <startEvent id="start_commande_restaurant" name="Commande reçue">
+      <outgoing>flow_r1</outgoing>
+      <messageEventDefinition messageRef="msg_commande_restaurant"/>
+    </startEvent>
+    <userTask id="task_preparer_commande" name="Préparer commande (menu à la carte)">
+      <incoming>flow_r1</incoming>
+      <outgoing>flow_r2</outgoing>
+    </userTask>
+    <userTask id="task_servir_client" name="Servir le client">
+      <incoming>flow_r2</incoming>
+      <outgoing>flow_r3</outgoing>
+    </userTask>
+    <exclusiveGateway id="gw_mode_paiement" name="Mode facturation ?">
+      <incoming>flow_r3</incoming>
+      <outgoing>flow_r4_chambre</outgoing>
+      <outgoing>flow_r4_direct</outgoing>
+    </exclusiveGateway>
+    <sendTask id="task_transferer_facture" name="Transférer facture à la chambre">
+      <incoming>flow_r4_chambre</incoming>
+      <outgoing>flow_r5</outgoing>
+    </sendTask>
+    <userTask id="task_paiement_direct" name="Paiement direct restaurant">
+      <incoming>flow_r4_direct</incoming>
+      <outgoing>flow_r6</outgoing>
+    </userTask>
+    <exclusiveGateway id="gw_merge_paiement" name="Fusion">
+      <incoming>flow_r5</incoming>
+      <incoming>flow_r6</incoming>
+      <outgoing>flow_r7</outgoing>
+    </exclusiveGateway>
+    <endEvent id="end_restaurant" name="Commande terminée">
+      <incoming>flow_r7</incoming>
+    </endEvent>
+    <sequenceFlow id="flow_r1" sourceRef="start_commande_restaurant" targetRef="task_preparer_commande"/>
+    <sequenceFlow id="flow_r2" sourceRef="task_preparer_commande" targetRef="task_servir_client"/>
+    <sequenceFlow id="flow_r3" sourceRef="task_servir_client" targetRef="gw_mode_paiement"/>
+    <sequenceFlow id="flow_r4_chambre" name="Additionner à la chambre" sourceRef="gw_mode_paiement" targetRef="task_transferer_facture"/>
+    <sequenceFlow id="flow_r4_direct" name="Paiement direct" sourceRef="gw_mode_paiement" targetRef="task_paiement_direct"/>
+    <sequenceFlow id="flow_r5" sourceRef="task_transferer_facture" targetRef="gw_merge_paiement"/>
+    <sequenceFlow id="flow_r6" sourceRef="task_paiement_direct" targetRef="gw_merge_paiement"/>
+    <sequenceFlow id="flow_r7" sourceRef="gw_merge_paiement" targetRef="end_restaurant"/>
+  </process>
+
+  <process id="Process_Facebook" name="Page Facebook" isExecutable="true">
+    <startEvent id="start_facebook" name="Demande tarif reçue">
+      <outgoing>flow_fb1</outgoing>
+      <messageEventDefinition messageRef="msg_demande_tarif"/>
+    </startEvent>
+    <userTask id="task_consulter_tarifs" name="Consulter tarifs chambres">
+      <incoming>flow_fb1</incoming>
+      <outgoing>flow_fb2</outgoing>
+    </userTask>
+    <sendTask id="task_repondre_tarif" name="Répondre au client">
+      <incoming>flow_fb2</incoming>
+      <outgoing>flow_fb3</outgoing>
+    </sendTask>
+    <userTask id="task_diffuser_menus" name="Diffuser menus restaurant">
+      <incoming>flow_fb3</incoming>
+      <outgoing>flow_fb4</outgoing>
+    </userTask>
+    <endEvent id="end_facebook" name="Fin">
+      <incoming>flow_fb4</incoming>
+    </endEvent>
+    <sequenceFlow id="flow_fb1" sourceRef="start_facebook" targetRef="task_consulter_tarifs"/>
+    <sequenceFlow id="flow_fb2" sourceRef="task_consulter_tarifs" targetRef="task_repondre_tarif"/>
+    <sequenceFlow id="flow_fb3" sourceRef="task_repondre_tarif" targetRef="task_diffuser_menus"/>
+    <sequenceFlow id="flow_fb4" sourceRef="task_diffuser_menus" targetRef="end_facebook"/>
+  </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_Hotel_Restaurant">
+      <bpmndi:BPMNShape id="shape_pool_client" bpmnElement="pool_client" isHorizontal="true">
+        <dc:Bounds x="160" y="20" width="1800" height="400"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_start_client" bpmnElement="start_client">
+        <dc:Bounds x="220" y="182" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_canal" bpmnElement="gw_canal_client" isMarkerVisible="true">
+        <dc:Bounds x="300" y="175" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_reserver" bpmnElement="task_reserver_chambre">
+        <dc:Bounds x="400" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_piece_id" bpmnElement="task_fournir_piece_identite">
+        <dc:Bounds x="550" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_confirmation" bpmnElement="task_recevoir_confirmation">
+        <dc:Bounds x="700" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_paiement" bpmnElement="task_effectuer_paiement">
+        <dc:Bounds x="850" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_sejour" bpmnElement="task_sejour">
+        <dc:Bounds x="1000" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_resto" bpmnElement="gw_restaurant" isMarkerVisible="true">
+        <dc:Bounds x="1150" y="175" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_cmd_resto" bpmnElement="task_commander_restaurant">
+        <dc:Bounds x="1250" y="100" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_facture_resto" bpmnElement="task_recevoir_facture_resto">
+        <dc:Bounds x="1400" y="100" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_merge_resto" bpmnElement="gw_merge_resto" isMarkerVisible="true">
+        <dc:Bounds x="1550" y="175" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_quitter" bpmnElement="task_quitter_hotel">
+        <dc:Bounds x="1650" y="160" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_client" bpmnElement="end_client">
+        <dc:Bounds x="1800" y="182" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_tarif_fb" bpmnElement="task_demander_tarif">
+        <dc:Bounds x="400" y="310" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_reponse_tarif" bpmnElement="task_recevoir_reponse_tarif">
+        <dc:Bounds x="550" y="310" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_apres_tarif" bpmnElement="gw_apres_tarif" isMarkerVisible="true">
+        <dc:Bounds x="700" y="325" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_no_resa" bpmnElement="end_client_no_reservation">
+        <dc:Bounds x="850" y="332" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_pool_hotel" bpmnElement="pool_hotel" isHorizontal="true">
+        <dc:Bounds x="160" y="460" width="1800" height="700"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_lane_recep" bpmnElement="lane_receptionniste" isHorizontal="true">
+        <dc:Bounds x="190" y="460" width="1770" height="250"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_lane_menage" bpmnElement="lane_menage" isHorizontal="true">
+        <dc:Bounds x="190" y="710" width="1770" height="200"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_lane_comptable" bpmnElement="lane_comptable" isHorizontal="true">
+        <dc:Bounds x="190" y="910" width="1770" height="250"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_start_resa" bpmnElement="start_reception_reservation">
+        <dc:Bounds x="250" y="562" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_dispo" bpmnElement="task_verifier_disponibilite">
+        <dc:Bounds x="350" y="540" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_dispo" bpmnElement="gw_chambre_disponible" isMarkerVisible="true">
+        <dc:Bounds x="500" y="555" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_facture" bpmnElement="task_emettre_facture">
+        <dc:Bounds x="620" y="540" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_encaisser" bpmnElement="task_encaisser_paiement">
+        <dc:Bounds x="780" y="540" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_copie_fact" bpmnElement="task_envoyer_copie_facture">
+        <dc:Bounds x="940" y="540" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_resa" bpmnElement="end_reservation_complete">
+        <dc:Bounds x="1100" y="562" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_refusee" bpmnElement="end_reservation_refusee">
+        <dc:Bounds x="500" y="480" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_notif_menage" bpmnElement="task_recevoir_notif_menage">
+        <dc:Bounds x="1250" y="562" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_marquer_dispo" bpmnElement="task_marquer_chambre_disponible">
+        <dc:Bounds x="1350" y="540" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_start_menage" bpmnElement="start_menage">
+        <dc:Bounds x="250" y="792" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_nettoyer" bpmnElement="task_nettoyer_chambre">
+        <dc:Bounds x="350" y="770" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_remplacer" bpmnElement="task_remplacer_articles">
+        <dc:Bounds x="520" y="770" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_notifier" bpmnElement="task_notifier_receptionniste">
+        <dc:Bounds x="700" y="770" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_menage" bpmnElement="end_menage">
+        <dc:Bounds x="870" y="792" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_start_compta" bpmnElement="start_comptabilite">
+        <dc:Bounds x="250" y="1012" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_recev_fact" bpmnElement="task_recevoir_copie_facture">
+        <dc:Bounds x="350" y="990" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_verif_stock" bpmnElement="task_verifier_stock">
+        <dc:Bounds x="520" y="990" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_stock" bpmnElement="gw_stock_suffisant" isMarkerVisible="true">
+        <dc:Bounds x="680" y="1005" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_cmd_art" bpmnElement="task_commander_articles">
+        <dc:Bounds x="780" y="930" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_compter" bpmnElement="task_compter_factures_jour">
+        <dc:Bounds x="940" y="990" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_tdb" bpmnElement="task_generer_tableau_bord">
+        <dc:Bounds x="1100" y="990" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_compta" bpmnElement="end_comptabilite">
+        <dc:Bounds x="1260" y="1012" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_pool_restaurant" bpmnElement="pool_restaurant" isHorizontal="true">
+        <dc:Bounds x="160" y="1200" width="1200" height="250"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_start_resto" bpmnElement="start_commande_restaurant">
+        <dc:Bounds x="220" y="1307" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_preparer" bpmnElement="task_preparer_commande">
+        <dc:Bounds x="320" y="1285" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_servir" bpmnElement="task_servir_client">
+        <dc:Bounds x="470" y="1285" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_mode_paie" bpmnElement="gw_mode_paiement" isMarkerVisible="true">
+        <dc:Bounds x="620" y="1300" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_transferer" bpmnElement="task_transferer_facture">
+        <dc:Bounds x="730" y="1230" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_paie_direct" bpmnElement="task_paiement_direct">
+        <dc:Bounds x="730" y="1350" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_gw_merge_paie" bpmnElement="gw_merge_paiement" isMarkerVisible="true">
+        <dc:Bounds x="900" y="1300" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_resto" bpmnElement="end_restaurant">
+        <dc:Bounds x="1010" y="1307" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="shape_pool_facebook" bpmnElement="pool_facebook" isHorizontal="true">
+        <dc:Bounds x="160" y="1490" width="900" height="200"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_start_fb" bpmnElement="start_facebook">
+        <dc:Bounds x="220" y="1572" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_consulter" bpmnElement="task_consulter_tarifs">
+        <dc:Bounds x="320" y="1550" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_repondre" bpmnElement="task_repondre_tarif">
+        <dc:Bounds x="480" y="1550" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_task_diffuser" bpmnElement="task_diffuser_menus">
+        <dc:Bounds x="640" y="1550" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="shape_end_fb" bpmnElement="end_facebook">
+        <dc:Bounds x="800" y="1572" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="edge_flow_c1" bpmnElement="flow_c1">
+        <di:waypoint x="256" y="200"/>
+        <di:waypoint x="300" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c2_web" bpmnElement="flow_c2_web">
+        <di:waypoint x="350" y="200"/>
+        <di:waypoint x="400" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c2_fb" bpmnElement="flow_c2_fb">
+        <di:waypoint x="325" y="225"/>
+        <di:waypoint x="325" y="350"/>
+        <di:waypoint x="400" y="350"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c3" bpmnElement="flow_c3">
+        <di:waypoint x="500" y="200"/>
+        <di:waypoint x="550" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c4" bpmnElement="flow_c4">
+        <di:waypoint x="650" y="200"/>
+        <di:waypoint x="700" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c5" bpmnElement="flow_c5">
+        <di:waypoint x="800" y="200"/>
+        <di:waypoint x="850" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c6" bpmnElement="flow_c6">
+        <di:waypoint x="950" y="200"/>
+        <di:waypoint x="1000" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c7" bpmnElement="flow_c7">
+        <di:waypoint x="1100" y="200"/>
+        <di:waypoint x="1150" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c8_oui" bpmnElement="flow_c8_oui">
+        <di:waypoint x="1175" y="175"/>
+        <di:waypoint x="1175" y="140"/>
+        <di:waypoint x="1250" y="140"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c8_non" bpmnElement="flow_c8_non">
+        <di:waypoint x="1200" y="200"/>
+        <di:waypoint x="1550" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c9" bpmnElement="flow_c9">
+        <di:waypoint x="1350" y="140"/>
+        <di:waypoint x="1400" y="140"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c10" bpmnElement="flow_c10">
+        <di:waypoint x="1500" y="140"/>
+        <di:waypoint x="1575" y="140"/>
+        <di:waypoint x="1575" y="175"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c11" bpmnElement="flow_c11">
+        <di:waypoint x="1600" y="200"/>
+        <di:waypoint x="1650" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c_end" bpmnElement="flow_c_end">
+        <di:waypoint x="1750" y="200"/>
+        <di:waypoint x="1800" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c_fb1" bpmnElement="flow_c_fb1">
+        <di:waypoint x="500" y="350"/>
+        <di:waypoint x="550" y="350"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c_fb2" bpmnElement="flow_c_fb2">
+        <di:waypoint x="650" y="350"/>
+        <di:waypoint x="700" y="350"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c_fb3_oui" bpmnElement="flow_c_fb3_oui">
+        <di:waypoint x="725" y="325"/>
+        <di:waypoint x="725" y="260"/>
+        <di:waypoint x="450" y="260"/>
+        <di:waypoint x="450" y="240"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_c_fb3_non" bpmnElement="flow_c_fb3_non">
+        <di:waypoint x="750" y="350"/>
+        <di:waypoint x="850" y="350"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow_h1" bpmnElement="flow_h1">
+        <di:waypoint x="286" y="580"/>
+        <di:waypoint x="350" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h2" bpmnElement="flow_h2">
+        <di:waypoint x="450" y="580"/>
+        <di:waypoint x="500" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h3_oui" bpmnElement="flow_h3_oui">
+        <di:waypoint x="550" y="580"/>
+        <di:waypoint x="620" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h3_non" bpmnElement="flow_h3_non">
+        <di:waypoint x="525" y="555"/>
+        <di:waypoint x="525" y="516"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h4" bpmnElement="flow_h4">
+        <di:waypoint x="720" y="580"/>
+        <di:waypoint x="780" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h5" bpmnElement="flow_h5">
+        <di:waypoint x="880" y="580"/>
+        <di:waypoint x="940" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h6" bpmnElement="flow_h6">
+        <di:waypoint x="1040" y="580"/>
+        <di:waypoint x="1100" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h_notif" bpmnElement="flow_h_notif_to_mark">
+        <di:waypoint x="1286" y="580"/>
+        <di:waypoint x="1350" y="580"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_h_notif1" bpmnElement="flow_h_notif1">
+        <di:waypoint x="1450" y="580"/>
+        <di:waypoint x="1475" y="580"/>
+        <di:waypoint x="1475" y="640"/>
+        <di:waypoint x="1118" y="640"/>
+        <di:waypoint x="1118" y="598"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow_m1" bpmnElement="flow_m1">
+        <di:waypoint x="286" y="810"/>
+        <di:waypoint x="350" y="810"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_m2" bpmnElement="flow_m2">
+        <di:waypoint x="450" y="810"/>
+        <di:waypoint x="520" y="810"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_m3" bpmnElement="flow_m3">
+        <di:waypoint x="620" y="810"/>
+        <di:waypoint x="700" y="810"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_m4" bpmnElement="flow_m4">
+        <di:waypoint x="800" y="810"/>
+        <di:waypoint x="870" y="810"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow_cp1" bpmnElement="flow_cp1">
+        <di:waypoint x="286" y="1030"/>
+        <di:waypoint x="350" y="1030"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp2" bpmnElement="flow_cp2">
+        <di:waypoint x="450" y="1030"/>
+        <di:waypoint x="520" y="1030"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp3" bpmnElement="flow_cp3">
+        <di:waypoint x="620" y="1030"/>
+        <di:waypoint x="680" y="1030"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp4_oui" bpmnElement="flow_cp4_oui">
+        <di:waypoint x="730" y="1030"/>
+        <di:waypoint x="940" y="1030"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp4_non" bpmnElement="flow_cp4_non">
+        <di:waypoint x="705" y="1005"/>
+        <di:waypoint x="705" y="970"/>
+        <di:waypoint x="780" y="970"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp5" bpmnElement="flow_cp5">
+        <di:waypoint x="880" y="970"/>
+        <di:waypoint x="990" y="970"/>
+        <di:waypoint x="990" y="990"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp6" bpmnElement="flow_cp6">
+        <di:waypoint x="1040" y="1030"/>
+        <di:waypoint x="1100" y="1030"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_cp7" bpmnElement="flow_cp7">
+        <di:waypoint x="1200" y="1030"/>
+        <di:waypoint x="1260" y="1030"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow_r1" bpmnElement="flow_r1">
+        <di:waypoint x="256" y="1325"/>
+        <di:waypoint x="320" y="1325"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r2" bpmnElement="flow_r2">
+        <di:waypoint x="420" y="1325"/>
+        <di:waypoint x="470" y="1325"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r3" bpmnElement="flow_r3">
+        <di:waypoint x="570" y="1325"/>
+        <di:waypoint x="620" y="1325"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r4_chambre" bpmnElement="flow_r4_chambre">
+        <di:waypoint x="645" y="1300"/>
+        <di:waypoint x="645" y="1270"/>
+        <di:waypoint x="730" y="1270"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r4_direct" bpmnElement="flow_r4_direct">
+        <di:waypoint x="645" y="1350"/>
+        <di:waypoint x="645" y="1390"/>
+        <di:waypoint x="730" y="1390"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r5" bpmnElement="flow_r5">
+        <di:waypoint x="830" y="1270"/>
+        <di:waypoint x="925" y="1270"/>
+        <di:waypoint x="925" y="1300"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r6" bpmnElement="flow_r6">
+        <di:waypoint x="830" y="1390"/>
+        <di:waypoint x="925" y="1390"/>
+        <di:waypoint x="925" y="1350"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_r7" bpmnElement="flow_r7">
+        <di:waypoint x="950" y="1325"/>
+        <di:waypoint x="1010" y="1325"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_flow_fb1" bpmnElement="flow_fb1">
+        <di:waypoint x="256" y="1590"/>
+        <di:waypoint x="320" y="1590"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_fb2" bpmnElement="flow_fb2">
+        <di:waypoint x="420" y="1590"/>
+        <di:waypoint x="480" y="1590"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_fb3" bpmnElement="flow_fb3">
+        <di:waypoint x="580" y="1590"/>
+        <di:waypoint x="640" y="1590"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_flow_fb4" bpmnElement="flow_fb4">
+        <di:waypoint x="740" y="1590"/>
+        <di:waypoint x="800" y="1590"/>
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="edge_mf_reservation" bpmnElement="mf_reservation">
+        <di:waypoint x="450" y="240"/>
+        <di:waypoint x="450" y="420"/>
+        <di:waypoint x="268" y="420"/>
+        <di:waypoint x="268" y="562"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_confirmation" bpmnElement="mf_confirmation">
+        <di:waypoint x="670" y="540"/>
+        <di:waypoint x="670" y="420"/>
+        <di:waypoint x="750" y="420"/>
+        <di:waypoint x="750" y="240"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_notif" bpmnElement="mf_notif_menage">
+        <di:waypoint x="750" y="770"/>
+        <di:waypoint x="750" y="700"/>
+        <di:waypoint x="1268" y="700"/>
+        <di:waypoint x="1268" y="598"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_copie" bpmnElement="mf_copie_facture">
+        <di:waypoint x="990" y="620"/>
+        <di:waypoint x="990" y="900"/>
+        <di:waypoint x="268" y="900"/>
+        <di:waypoint x="268" y="1012"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_tarif" bpmnElement="mf_demande_tarif">
+        <di:waypoint x="450" y="390"/>
+        <di:waypoint x="450" y="1470"/>
+        <di:waypoint x="238" y="1470"/>
+        <di:waypoint x="238" y="1572"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_reponse" bpmnElement="mf_reponse_tarif">
+        <di:waypoint x="530" y="1550"/>
+        <di:waypoint x="530" y="1470"/>
+        <di:waypoint x="600" y="1470"/>
+        <di:waypoint x="600" y="390"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_cmd_resto" bpmnElement="mf_commande_resto">
+        <di:waypoint x="1300" y="180"/>
+        <di:waypoint x="1300" y="1180"/>
+        <di:waypoint x="238" y="1180"/>
+        <di:waypoint x="238" y="1307"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_mf_fact_resto" bpmnElement="mf_facture_resto">
+        <di:waypoint x="780" y="1230"/>
+        <di:waypoint x="780" y="1180"/>
+        <di:waypoint x="1450" y="1180"/>
+        <di:waypoint x="1450" y="180"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>`;
+
+        const viewer = new BpmnJS({ container: '#canvas' });
+
+        async function renderDiagram() {
+            try {
+                await viewer.importXML(bpmnXML);
+                document.getElementById('loading').classList.add('hidden');
+                viewer.get('canvas').zoom('fit-viewport');
+            } catch (err) {
+                document.getElementById('loading').textContent = 'Erreur: ' + err.message;
+                console.error('Erreur BPMN:', err);
+            }
+        }
+
+        function zoomIn() { viewer.get('canvas').zoom(viewer.get('canvas').zoom() * 1.2); }
+        function zoomOut() { viewer.get('canvas').zoom(viewer.get('canvas').zoom() / 1.2); }
+        function fitViewport() { viewer.get('canvas').zoom('fit-viewport'); }
+
+        async function downloadSVG() {
+            const { svg } = await viewer.saveSVG();
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'hotel-restaurant-bpmn.svg';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        renderDiagram();
+    </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Bonita Studio files
+*.tar.gz
+*.exe
+*.dmg
+BonitaStudio/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node modules (if bpmn-to-image is installed locally)
+node_modules/
+package-lock.json
