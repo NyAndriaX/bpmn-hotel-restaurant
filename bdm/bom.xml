@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<businessObjectModel xmlns="http://documentation.bonitasoft.com/bdm-xml-schema/1.0" modelVersion="1.0" productVersion="9.0.0">
+    <businessObjects>
+        <businessObject qualifiedName="com.hotel.model.Chambre">
+            <fields>
+                <field type="STRING" length="50" name="numero" nullable="false" collection="false"/>
+                <field type="STRING" length="50" name="categorie" nullable="false" collection="false"/>
+                <field type="BOOLEAN" name="propre" nullable="false" collection="false"/>
+            </fields>
+            <uniqueConstraints/>
+            <queries/>
+            <indexes/>
+        </businessObject>
+    </businessObjects>
+</businessObjectModel>

@@ -1,73 +1,60 @@
-# Processus Métier - Hôtel et Restaurant (BPMN 2.0)
+# Projet Bonita — Hôtel et Restaurant
 
 Dépôt GitHub : https://github.com/NyAndriaX/bpmn-hotel-restaurant
 
-## Important : clonage Git dans Bonita Studio
+Projet Bonita Studio importable (Git ou archive BOS), modélisant le workflow hôtel/restaurant.
 
-**Ne pas utiliser** `Équipe → Git → Cloner` sur ce dépôt en l'état actuel.
+## Importer le projet dans Bonita Studio
 
-Bonita Studio affichera : *« Bonita project descriptor not found »* car ce dépôt contient un **diagramme BPMN**, pas un **projet Bonita** complet (structure Maven + `.project` générée par le Studio).
+**Guide détaillé : [IMPORT-BONITA.md](IMPORT-BONITA.md)**
 
-**Procédure correcte :** voir le guide détaillé **[IMPORT-BONITA.md](IMPORT-BONITA.md)**
+### Option A — Git (cloner le projet)
 
-En bref :
-1. **Fichier** → **Nouveau projet…** dans Bonita Studio
-2. **Fichier** → **Importer** → **Diagramme BPMN 2.0** → `hotel-restaurant-process.bpmn`
-3. (Optionnel) **Équipe** → **Git** → **Partager avec Git** pour pousser un vrai projet Bonita sur GitHub
+1. **Équipe** → **Git** → **Cloner…**
+2. URI : `git@github.com:NyAndriaX/bpmn-hotel-restaurant.git`
 
-## Fichiers du dépôt
+### Option B — Archive BOS
 
-| Fichier | Description |
-|---------|-------------|
-| `hotel-restaurant-process.bpmn` | Diagramme BPMN 2.0 (import Bonita) |
-| `visualisation-bpmn.html` | Aperçu dans le navigateur |
-| `IMPORT-BONITA.md` | Guide d'import et dépannage clone Git |
-| `installer-bonita.sh` / `installer-bonita.bat` | Installation Bonita Studio |
+1. Télécharger [releases/hotel-restaurant-1.0.0.bos](releases/hotel-restaurant-1.0.0.bos)
+2. **Fichier** → **Importer** → **Archive BOS…** → créer un nouveau projet
 
-## Structure du processus
+## Structure du dépôt
 
-### Pools (Participants)
+```
+hotel-restaurant/          # Projet Bonita (racine)
+├── app/diagrams/          # Processus (.proc)
+├── bdm/                   # Modèle de données métier
+├── pom.xml
+├── docs/                  # BPMN de référence + visualisation HTML
+├── releases/              # Archive .bos pour import
+└── scripts/               # Installation Bonita Studio
+```
 
-| Pool | Description |
-|------|-------------|
-| **Client** | Parcours client : réservation, séjour, commande restaurant |
-| **Hôtel** | Gestion interne avec 3 lanes |
-| **Restaurant** | Gestion des commandes et facturation |
-| **Page Facebook** | Réponse aux demandes de tarifs |
+## Processus métier (référence)
 
-### Lanes (Hôtel)
+### Pools
 
-| Lane | Rôle |
+| Pool | Rôle |
 |------|------|
-| **Réceptionniste** | Vérification disponibilité, émission facture, encaissement |
-| **Femmes de ménage** | Nettoyage, remplacement articles, notification |
-| **Comptable** | Vérification stock, comptage factures, tableau de bord |
+| **Client** | Réservation, séjour, restaurant |
+| **Hôtel** | Réceptionniste, ménage, comptable |
+| **Restaurant** | Commandes, facturation |
+| **Page Facebook** | Tarifs, menus |
 
-### Catégories de chambres
-- Standard
-- Suite Senior
-- Suite Prestige
-
-### Articles par chambre (consommation par nuitée)
-- Gel douche × 1
-- Papier hygiénique × 1
-- Pantoufle × 1
-- Brosse à dent × 1
+Voir le diagramme complet : `docs/hotel-restaurant-process.bpmn`  
+Visualisation : ouvrir `docs/visualisation-bpmn.html` dans un navigateur.
 
 ### Règles métier
-- Seules les chambres **propres** peuvent être vendues
-- Chaque nuitée = consommation des 4 articles
-- Le ménage doit notifier le réceptionniste après nettoyage
-- Le comptable vérifie le stock et réapprovisionne si nécessaire
-- La facture restaurant peut être transférée à la chambre
 
-## Flux de messages entre pools
+- 3 catégories de chambres : Standard, Suite Senior, Suite Prestige
+- Articles par nuitée : gel douche, papier hygiénique, pantoufle, brosse à dent
+- Seules les chambres **propres** sont vendues
+- Le ménage notifie la réception après nettoyage
+- Facture restaurant transférable sur la chambre
 
-1. Client → Hôtel : Demande de réservation
-2. Hôtel → Client : Confirmation + Facture
-3. Femmes de ménage → Réceptionniste : Notification chambre propre
-4. Réceptionniste → Comptable : Copie de facture
-5. Client → Facebook : Demande de tarif
-6. Facebook → Client : Réponse tarif
-7. Client → Restaurant : Commande
-8. Restaurant → Client : Facture ajoutée à la chambre
+## Installation de Bonita Studio
+
+- Linux : `scripts/installer-bonita.sh`
+- Windows : `scripts/installer-bonita.bat`
+
+Téléchargement : https://www.bonitasoft.com/downloads

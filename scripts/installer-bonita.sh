@@ -7,7 +7,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BPMN_FILE="$SCRIPT_DIR/hotel-restaurant-process.bpmn"
+BPMN_FILE="$SCRIPT_DIR/../docs/hotel-restaurant-process.bpmn"
 INSTALL_DIR="$HOME/BonitaStudio"
 BONITA_VERSION="2026.1"
 

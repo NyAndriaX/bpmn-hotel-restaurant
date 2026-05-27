@@ -1,20 +1,30 @@
-# Bonita Studio files
+# Bonita Studio / Maven
+bin/
+.classpath
+.settings/
+target/
+.flattened-pom.xml
+dependency-reduced-pom.xml
+pom.xml.versionsBackup
+node/
+node_modules/
+/h2_database/
+/lib/bdm-client-pojo.jar
+/src-providedGroovy/
+.idea/
+*.swp
+*.swo
+
+# Bonita Studio installers (large binaries)
 *.tar.gz
 *.exe
 *.dmg
 BonitaStudio/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Node modules (if bpmn-to-image is installed locally)
-node_modules/
-package-lock.json
+# Build BOS temp
+/bos-build/

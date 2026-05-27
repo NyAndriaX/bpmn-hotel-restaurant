@@ -8,7 +8,7 @@ echo ╚════════════════════════
 echo.
 
 set "SCRIPT_DIR=%~dp0"
-set "BPMN_FILE=%SCRIPT_DIR%hotel-restaurant-process.bpmn"
+set "BPMN_FILE=%SCRIPT_DIR%..\docs\hotel-restaurant-process.bpmn"
 set "INSTALL_DIR=%USERPROFILE%\BonitaStudio"
 set "BONITA_VERSION=2026.1"
 
