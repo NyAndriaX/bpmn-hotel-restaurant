@@ -1,14 +1,28 @@
 # Processus Métier - Hôtel et Restaurant (BPMN 2.0)
 
-## Fichier principal
-- `hotel-restaurant-process.bpmn` — Fichier BPMN 2.0 importable dans Bonita Studio
+Dépôt GitHub : https://github.com/NyAndriaX/bpmn-hotel-restaurant
 
-## Comment importer dans Bonita Studio
+## Important : clonage Git dans Bonita Studio
 
-1. Ouvrir **Bonita Studio**
-2. Menu **Fichier** → **Importer** → **Diagramme BPMN 2.0**
-3. Sélectionner le fichier `hotel-restaurant-process.bpmn`
-4. Le diagramme s'ouvre avec tous les pools et lanes
+**Ne pas utiliser** `Équipe → Git → Cloner` sur ce dépôt en l'état actuel.
+
+Bonita Studio affichera : *« Bonita project descriptor not found »* car ce dépôt contient un **diagramme BPMN**, pas un **projet Bonita** complet (structure Maven + `.project` générée par le Studio).
+
+**Procédure correcte :** voir le guide détaillé **[IMPORT-BONITA.md](IMPORT-BONITA.md)**
+
+En bref :
+1. **Fichier** → **Nouveau projet…** dans Bonita Studio
+2. **Fichier** → **Importer** → **Diagramme BPMN 2.0** → `hotel-restaurant-process.bpmn`
+3. (Optionnel) **Équipe** → **Git** → **Partager avec Git** pour pousser un vrai projet Bonita sur GitHub
+
+## Fichiers du dépôt
+
+| Fichier | Description |
+|---------|-------------|
+| `hotel-restaurant-process.bpmn` | Diagramme BPMN 2.0 (import Bonita) |
+| `visualisation-bpmn.html` | Aperçu dans le navigateur |
+| `IMPORT-BONITA.md` | Guide d'import et dépannage clone Git |
+| `installer-bonita.sh` / `installer-bonita.bat` | Installation Bonita Studio |
 
 ## Structure du processus
 
