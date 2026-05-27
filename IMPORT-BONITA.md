@@ -55,6 +55,20 @@ Le fichier `.proc` dans le projet est un **squelette Bonita** (basé sur le tuto
 
 ---
 
+## Erreur au déploiement : formulaire UI introuvable
+
+Si vous voyez :
+
+```
+InternalFormNotFoundException: UIDesigner form with id '...' has not been found
+```
+
+**Cause :** le processus référence des pages UI Designer dans `app/web_page/` qui manquent dans votre copie locale.
+
+**Solution :** exécutez `git pull` pour récupérer les formulaires, puis **Fichier → Déployer** à nouveau. Si besoin, supprimez le projet et re-clonez le dépôt.
+
+---
+
 ## Récapitulatif
 
 | Action | Utiliser |
